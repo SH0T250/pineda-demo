@@ -172,9 +172,13 @@ const fromRow = (row) => {
   return obj
 }
 
+// Sort column per table. Only the transactional tables carry created_at; the
+// parts and asset catalogs don't, and sorting them by name reads better anyway.
+const ORDER_BY = { jobs: 'created_at', quotes: 'created_at', invoices: 'created_at', parts: 'item', assets: 'name' }
+
 async function fetchAll() {
   const cols = Object.keys(COLS)
-  const results = await Promise.all(cols.map((c) => supabase.from(c).select('*').order('created_at')))
+  const results = await Promise.all(cols.map((c) => supabase.from(c).select('*').order(ORDER_BY[c])))
   const out = {}
   results.forEach((r, i) => {
     if (r.error) throw new Error(`${cols[i]}: ${r.error.message}`)
