@@ -1,23 +1,35 @@
-# Connect Supabase (real accounts + synced data)
+# Supabase — connected
 
-> **Status:** the live driver is built and deployed. It switches on by itself as soon as `.env` has real values — nothing else to code. Demo mode stays on-device either way.
->
-> **Already ran the first schema?** Run `supabase/migration-01.sql` too — it adds the invoice-document columns (itemized lines, invoice numbers, dates, tax).
->
-> **Which key:** the **publishable** key (`sb_publishable_…`), copied with its copy button so you get the whole string. Never the `sb_secret_…` one.
+**Status: done.** The database is live, the app is wired to it, and both are deployed.
 
-The app runs fully on device-local storage until this is done — demo mode works either way. Do this when you want real logins and data that syncs across Chaun's phone + laptop.
+| | |
+|---|---|
+| Project | `pineda-os` |
+| URL | `https://ohqwliftdbmzmsvwdunp.supabase.co` |
+| Key | publishable (`sb_publishable_…`) in `.env` — gitignored |
+| Tables | jobs · quotes · invoices · parts · assets |
+| Migrations | `schema.sql` + `migration-01.sql` — both run and verified |
 
-1. Create a free project at https://supabase.com (name: `pineda-os`, any region near Texas).
-2. In the project: **SQL Editor → New query** → paste all of `supabase/schema.sql` → Run.
-3. **Project Settings → API**: copy the `Project URL` and the `anon public` key.
-4. In `C:\Users\Austin\pineda-demo`, create a file named `.env`:
-   ```
-   VITE_SUPABASE_URL=https://YOURPROJECT.supabase.co
-   VITE_SUPABASE_ANON_KEY=YOUR_ANON_KEY
-   ```
-   (The anon key is designed to be public — it ships in the app bundle. Data is protected by Row Level Security requiring sign-in.)
-5. Rebuild + redeploy (`npm run build`, push `dist` to gh-pages).
-6. Tell Claude "Supabase is connected" — the data layer's live driver gets wired and tested then (sign-up, role assignment for Chaun, data sync).
+Verified by request, not assumption: all five tables respond, every document column resolves, anonymous reads return nothing and anonymous writes are rejected with `401 — new row violates row-level security policy`.
 
-Authentication: Supabase Auth email/password. New sign-ups default to the client role; Chaun's account gets `role: owner` set in user metadata.
+## The one manual step left
+
+Creating a login with a password is yours to do — I don't create accounts or set passwords on your behalf.
+
+**Supabase → Authentication → Users → Add user**
+
+- Email: `pinedahvac@yahoo.com`
+- Password: pick one, send it to Chaun however you normally would
+- **Tick "Auto Confirm User"** — without it he'd have to click a confirmation email before he can sign in
+
+No metadata JSON needed. The app resolves his role from the email itself (`OWNER_EMAILS` in `src/store.jsx`), so that account lands in the Owner Command Center. `austinjjones210@gmail.com` is on that list too, so you can create yourself an account the same way for support access. Anyone else who signs up gets the client portal.
+
+## What happens on his first sign-in
+
+The tables are empty. On the first real sign-in the app pushes the starter catalog up — parts, assets, the sample jobs and quote documents — so he doesn't open a blank app. From then on everything he enters syncs across his phone and laptop, and the header reads "Synced · all devices."
+
+Demo mode is unaffected either way. The one-tap Chaun/Maria buttons stay entirely on-device, so a bad connection at his shop can't break your pitch.
+
+## If something breaks
+
+Sync failures surface as a red banner in the app rather than failing silently, and writes still land on the device. Check **Supabase → Table Editor** to see rows arriving, and **Authentication → Users** to confirm the account is confirmed.
