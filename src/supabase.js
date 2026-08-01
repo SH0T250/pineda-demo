@@ -6,4 +6,8 @@ import { createClient } from '@supabase/supabase-js'
 const url = import.meta.env.VITE_SUPABASE_URL
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = url && key ? createClient(url, key) : null
+// A half-filled .env (URL set, key still the placeholder) must not produce a
+// client — it would fail every sign-in instead of falling back to local mode.
+const ready = !!url && !!key && !key.startsWith('PASTE_')
+
+export const supabase = ready ? createClient(url, key) : null
