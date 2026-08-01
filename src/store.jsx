@@ -2,7 +2,7 @@
 // Local driver: localStorage, seeded from data.js — full CRUD, works offline, powers demo mode.
 // Supabase driver: activates for real accounts once VITE_SUPABASE_URL/KEY are set (see SUPABASE-SETUP.md).
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { jobs as seedJobs, quote as seedQuote, invoices as seedInvoices, parts as seedParts, assets as seedAssets } from './data.js'
+import { company, jobs as seedJobs, quote as seedQuote, invoices as seedInvoices, parts as seedParts, assets as seedAssets } from './data.js'
 import { supabase } from './supabase.js'
 
 const DB_KEY = 'pineda-db-v4'
@@ -198,6 +198,18 @@ async function seedRemoteIfEmpty(remote) {
   return remote
 }
 
+// Which sign-ins land in the Owner Command Center. This is navigation, not a
+// security boundary — RLS grants every signed-in user the same data access
+// because it's a single-company app. Keeping it here means creating Chaun's
+// account is just "add user + password", with no metadata JSON to get wrong.
+const OWNER_EMAILS = new Set([
+  'pinedahvac@yahoo.com',
+  'chaun@pinedahvac.com',
+  'austinjjones210@gmail.com', // Austin, for support access
+])
+const isOwnerEmail = (email) => OWNER_EMAILS.has((email || '').trim().toLowerCase())
+const resolveRole = (email, meta) => meta?.role || (isOwnerEmail(email) ? 'owner' : 'client')
+
 const StoreCtx = createContext(null)
 export const useStore = () => useContext(StoreCtx)
 
@@ -271,12 +283,19 @@ export function StoreProvider({ children }) {
       if (!supabase) throw new Error('Live accounts aren’t connected yet — use demo mode, or connect Supabase (see setup guide).')
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      const role = data.user?.user_metadata?.role || 'client'
-      setUser({ role, demo: false, name: data.user?.user_metadata?.name || email, email })
+      const meta = data.user?.user_metadata || {}
+      setUser({
+        role: resolveRole(email, meta),
+        demo: false,
+        name: meta.name || (isOwnerEmail(email) ? company.owner : email),
+        email,
+      })
     },
     signUp: async (email, password, name) => {
       if (!supabase) throw new Error('Live accounts aren’t connected yet — use demo mode, or connect Supabase (see setup guide).')
-      const { error } = await supabase.auth.signUp({ email, password, options: { data: { name, role: 'client' } } })
+      // No role in metadata — resolveRole decides, so an owner email can't be
+      // locked to 'client' by having signed up through the public form.
+      const { error } = await supabase.auth.signUp({ email, password, options: { data: { name } } })
       if (error) throw error
     },
     signOut: () => {
