@@ -15,7 +15,8 @@ create table if not exists quotes (
   created_at timestamptz not null default now(),
   num text, client text not null, addr text,
   status text not null default 'draft', -- draft | sent | won | lost
-  lines jsonb not null default '[]'
+  lines jsonb not null default '[]',
+  title text, issued text, expires text, deposit_pct numeric default 50
 );
 
 create table if not exists invoices (

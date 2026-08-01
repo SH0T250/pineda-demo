@@ -5,7 +5,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { jobs as seedJobs, quote as seedQuote, invoices as seedInvoices, parts as seedParts, assets as seedAssets } from './data.js'
 import { supabase } from './supabase.js'
 
-const DB_KEY = 'pineda-db-v3'
+const DB_KEY = 'pineda-db-v4'
 const AUTH_KEY = 'pineda-auth-v2'
 
 export const LABOR_SELL = 145
@@ -87,6 +87,27 @@ const INVOICE_DETAILS = {
   },
 }
 
+// Nancy Fischer's system replacement, itemized. Same $15,000 Chaun quoted in
+// QuickBooks — broken out so the customer can see what they're paying for.
+const NANCY_EQUIPMENT = [
+  { name: 'Goodman 5-Ton Inverter Condenser · side discharge, 20 SEER2', pn: 'GVXC200601', qty: 1, sell: 4650, cost: 2790 },
+  { name: 'Goodman 97% AFUE Modulating Gas Furnace · 120,000 BTU', pn: 'GCVM971205DX', qty: 1, sell: 2980, cost: 1788 },
+  { name: 'Goodman 5-Ton Cased Evaporator Coil', pn: 'CAPTA6030D3', qty: 1, sell: 1085, cost: 651 },
+  { name: 'ecobee Smart Pro Thermostat · professionally configured', pn: 'EB-STATE6P', qty: 1, sell: 365, cost: 219 },
+  { name: 'Secondary drain pan · galvanized, code-required', pn: 'DP-3626G', qty: 1, sell: 145, cost: 87 },
+  { name: 'Condensate float safety switch (drain kill switch)', pn: 'SS610E', qty: 2, sell: 60, cost: 36 },
+  { name: 'Refrigerant line set · 5-ton, insulated, with fittings', pn: 'LS-3458', qty: 1, sell: 485, cost: 291 },
+  { name: 'Composite equipment pad', pn: 'PAD-3636', qty: 1, sell: 135, cost: 81 },
+]
+const NANCY_LABOR = [
+  { name: 'Removal & haul-off of existing system', detail: 'Refrigerant recovered per EPA 608', sell: 625 },
+  { name: 'Installation & commissioning · 2 technicians', detail: '22 hrs @ $145 — set furnace/coil/condenser, braze line set, pressure test, evacuate to 500 microns', hours: 22 },
+  { name: 'Ductwork inspection & repair allowance', detail: 'Seal, re-strap, replace damaged runs as needed', sell: 580 },
+  { name: 'Electrical · disconnect, whip, breaker verification', detail: '', sell: 320 },
+  { name: 'Permit & TDLR inspection coordination', detail: '', sell: 185 },
+  { name: 'Startup, airflow balance & refrigerant weigh-in', detail: 'Verified subcooling and static pressure documented', sell: 135 },
+]
+
 function seedDb() {
   return {
     jobs: seedJobs.map((j) => ({ id: uid(), ...j })),
@@ -97,6 +118,19 @@ function seedDb() {
           { kind: 'part', name: '1/2 HP ECM Motor', pn: 'MOT18605', cost: 284, sell: 497, qty: 1 },
           { kind: 'part', name: '45/5 MFD Dual Cap', pn: 'TRCFD455', cost: 18.4, sell: 40.48, qty: 1 },
           { kind: 'labor', hours: 2.5 },
+        ],
+      },
+      {
+        id: uid(), num: '#Q-2014', client: 'Nancy Fischer',
+        addr: '20007 Cedar Branch, Garden Ridge, TX 78266', status: 'sent',
+        title: '5-Ton Gas Inverter System Replacement',
+        issued: 'Jul 28, 2026', expires: 'Aug 27, 2026',
+        depositPct: 50,
+        lines: [
+          ...NANCY_EQUIPMENT.map((e) => ({ kind: 'part', group: 'equipment', ...e })),
+          ...NANCY_LABOR.map((l) => (l.hours
+            ? { kind: 'labor', group: 'labor', hours: l.hours, name: l.name, detail: l.detail }
+            : { kind: 'part', group: 'labor', name: l.name, detail: l.detail, pn: '', qty: 1, sell: l.sell, cost: Math.round(l.sell * 0.45) })),
         ],
       },
     ],
@@ -119,7 +153,7 @@ function loadDb() {
 // (derived values like a part's sell price) stays client-side only.
 const COLS = {
   jobs: ['time', 'client', 'task', 'tech', 'addr', 'parts', 'rev', 'profit', 'done', 'aiBooked'],
-  quotes: ['num', 'client', 'addr', 'status', 'lines'],
+  quotes: ['num', 'client', 'addr', 'status', 'lines', 'title', 'issued', 'expires', 'depositPct'],
   invoices: ['client', 'amt', 'status', 'tone', 'num', 'addr', 'service', 'issued', 'due', 'reminded', 'tax', 'lines'],
   parts: ['item', 'vendor', 'pn', 'cost', 'markupPct'],
   assets: ['name', 'tag', 'value', 'status', 'tone'],

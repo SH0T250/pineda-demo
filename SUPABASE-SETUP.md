@@ -1,5 +1,11 @@
 # Connect Supabase (real accounts + synced data)
 
+> **Status:** the live driver is built and deployed. It switches on by itself as soon as `.env` has real values — nothing else to code. Demo mode stays on-device either way.
+>
+> **Already ran the first schema?** Run `supabase/migration-01.sql` too — it adds the invoice-document columns (itemized lines, invoice numbers, dates, tax).
+>
+> **Which key:** the **publishable** key (`sb_publishable_…`), copied with its copy button so you get the whole string. Never the `sb_secret_…` one.
+
 The app runs fully on device-local storage until this is done — demo mode works either way. Do this when you want real logins and data that syncs across Chaun's phone + laptop.
 
 1. Create a free project at https://supabase.com (name: `pineda-os`, any region near Texas).

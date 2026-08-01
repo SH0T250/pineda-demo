@@ -1,14 +1,40 @@
 // Pineda OS demo seed data — APP_TODAY is Wednesday, June 25, 2025 everywhere.
 export const APP_TODAY = { label: 'Wed, Jun 25', dow: 'Wednesday', full: 'Wednesday, June 25, 2025' }
 
+// Real business record — matches Chaun's filed QuickBooks paperwork and TDLR license.
 export const company = {
   name: 'Pineda Heating & Air',
+  legal: 'Pineda Heating and Air LLC',
   short: 'Pineda OS',
+  street: '2141 Good Luck Rd',
+  cityState: 'Seguin, TX 78155',
   city: 'New Braunfels, TX',
+  serviceArea: 'Seguin · New Braunfels · Garden Ridge · Canyon Lake',
   phone: '830-360-4802',
-  email: 'chaun@pinedahvac.com',
+  email: 'pinedahvac@yahoo.com',
   handle: 'pineda.hvac',
+  license: 'TACLB 00111996E',
+  regulator: 'Texas Department of Licensing and Regulation · 920 Colorado St, Austin, TX 78701',
+  owner: 'Chaun Pineda',
   tagline: 'The operating system for the modern trades business.',
+}
+
+// Nancy Fischer's system replacement — the real 7/28/26 QuickBooks quote (#2014),
+// kept verbatim as the "before" side of the quote comparison.
+export const quickbooksQuote = {
+  num: '2014',
+  date: '07/28/2026',
+  due: '07/28/2026',
+  client: 'Nancy Fischer',
+  addr: ['20007 Cedar Branch', 'Garden Ridge 78266'],
+  service: 'Services',
+  description: [
+    'Goodman 5 ton gas inverter side discharge system',
+    'Furnace', 'Coil', 'Condenser', 'Drain pan', 'Drain kill switch', 'Thermostat',
+    'Repair any damage to ductwork', 'Thermostat',
+    '10 years on major parts', '2 year labor warranty',
+  ],
+  amount: 15000, subtotal: 15000, tax: 0, total: 15000, payment: 7500, balance: 7500,
 }
 
 export const techs = [

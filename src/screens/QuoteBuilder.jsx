@@ -1,9 +1,10 @@
 // Quote Builder — the money engine. Build a quote, watch the margin live.
 import { useState } from 'react'
-import { Plus, X, Send, Check, FileText } from 'lucide-react'
+import { Plus, X, Send, Check, FileText, Printer } from 'lucide-react'
 import { money } from '../data.js'
 import { Badge, Card, ScreenTitle, Row, Button, Field, Input, Select, Sheet, useToast, EmptyState, Footnote } from '../ui.jsx'
 import { useStore, quoteTotals, partSell, LABOR_SELL } from '../store.jsx'
+import QuoteDoc from './QuoteDoc.jsx'
 
 const STATUS = {
   draft: { tone: 'muted', label: 'DRAFT' },
@@ -57,8 +58,10 @@ export default function QuoteBuilder({ go }) {
 
   // detail sheet
   const [detailId, setDetailId] = useState(null)
+  const [docId, setDocId] = useState(null)
   const [confirmLost, setConfirmLost] = useState(false)
   const q = db.quotes.find((x) => x.id === detailId)
+  const docQuote = db.quotes.find((x) => x.id === docId)
   const closeDetail = () => { setDetailId(null); setConfirmLost(false) }
 
   // builder sheet
@@ -152,6 +155,10 @@ export default function QuoteBuilder({ go }) {
               )}
             </div>
             <MoneyPanel lines={q.lines} />
+
+            <Button variant="secondary" className="w-full" onClick={() => { setDocId(q.id); setDetailId(null) }}>
+              <Printer className="h-4 w-4" />View quote · Print
+            </Button>
 
             {q.status === 'draft' && (
               <Button variant="primary" className="w-full" onClick={() => { update('quotes', q.id, { status: 'sent' }); toast(`Quote sent to ${q.client}`) }}>
@@ -262,6 +269,8 @@ export default function QuoteBuilder({ go }) {
           </div>
         </div>
       </Sheet>
+
+      {docQuote && <QuoteDoc quote={docQuote} onClose={() => setDocId(null)} />}
     </div>
   )
 }
