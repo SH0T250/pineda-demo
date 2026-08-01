@@ -114,6 +114,56 @@ function loadDb() {
   return seedDb()
 }
 
+// ---- Supabase driver -------------------------------------------------------
+// Columns the database actually has, per collection. Anything else on a record
+// (derived values like a part's sell price) stays client-side only.
+const COLS = {
+  jobs: ['time', 'client', 'task', 'tech', 'addr', 'parts', 'rev', 'profit', 'done', 'aiBooked'],
+  quotes: ['num', 'client', 'addr', 'status', 'lines'],
+  invoices: ['client', 'amt', 'status', 'tone', 'num', 'addr', 'service', 'issued', 'due', 'reminded', 'tax', 'lines'],
+  parts: ['item', 'vendor', 'pn', 'cost', 'markupPct'],
+  assets: ['name', 'tag', 'value', 'status', 'tone'],
+}
+const snake = (s) => s.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())
+const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+
+const toRow = (col, obj) => {
+  const row = {}
+  for (const k of COLS[col]) if (obj[k] !== undefined) row[snake(k)] = obj[k]
+  return row
+}
+const fromRow = (row) => {
+  const obj = {}
+  for (const [k, v] of Object.entries(row)) if (k !== 'created_at') obj[camel(k)] = v
+  return obj
+}
+
+async function fetchAll() {
+  const cols = Object.keys(COLS)
+  const results = await Promise.all(cols.map((c) => supabase.from(c).select('*').order('created_at')))
+  const out = {}
+  results.forEach((r, i) => {
+    if (r.error) throw new Error(`${cols[i]}: ${r.error.message}`)
+    out[cols[i]] = r.data.map(fromRow)
+  })
+  return out
+}
+
+// First real sign-in on an empty database: push the starter catalog up so the
+// app isn't blank. Only seeds tables that are actually empty.
+async function seedRemoteIfEmpty(remote) {
+  const local = seedDb()
+  const empty = Object.keys(COLS).filter((c) => remote[c].length === 0)
+  if (!empty.length) return remote
+  for (const col of empty) {
+    const rows = local[col].map((r) => toRow(col, r))
+    const { data, error } = await supabase.from(col).insert(rows).select()
+    if (error) throw new Error(`seed ${col}: ${error.message}`)
+    remote[col] = data.map(fromRow)
+  }
+  return remote
+}
+
 const StoreCtx = createContext(null)
 export const useStore = () => useContext(StoreCtx)
 
@@ -122,6 +172,10 @@ export function StoreProvider({ children }) {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem(AUTH_KEY)) } catch { return null }
   })
+  const [syncError, setSyncError] = useState(null)
+
+  // Live only for real (non-demo) accounts; demo mode always stays on-device.
+  const cloud = !!supabase && !!user && !user.demo
 
   useEffect(() => { try { localStorage.setItem(DB_KEY, JSON.stringify(db)) } catch { /* storage full/blocked */ } }, [db])
   useEffect(() => {
@@ -131,15 +185,51 @@ export function StoreProvider({ children }) {
     } catch { /* ignore */ }
   }, [user])
 
+  // Pull the account's data down on sign-in.
+  useEffect(() => {
+    if (!cloud) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const remote = await seedRemoteIfEmpty(await fetchAll())
+        if (!cancelled) { setDb(remote); setSyncError(null) }
+      } catch (e) {
+        if (!cancelled) setSyncError(e.message)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [cloud])
+
   const api = useMemo(() => ({
+    // Writes are optimistic: local state updates immediately so the UI never
+    // waits on the network, then the row is mirrored to Supabase.
     add: (col, item) => {
       const withId = { id: uid(), ...item }
       setDb((d) => ({ ...d, [col]: [...d[col], withId] }))
+      if (cloud) {
+        supabase.from(col).insert(toRow(col, item)).select().single()
+          .then(({ data, error }) => {
+            if (error) return setSyncError(error.message)
+            // adopt the database's id so later edits target the right row
+            setDb((d) => ({ ...d, [col]: d[col].map((x) => (x.id === withId.id ? { ...x, id: data.id } : x)) }))
+          })
+      }
       return withId
     },
-    update: (col, id, patch) =>
-      setDb((d) => ({ ...d, [col]: d[col].map((x) => (x.id === id ? { ...x, ...(typeof patch === 'function' ? patch(x) : patch) } : x)) })),
-    remove: (col, id) => setDb((d) => ({ ...d, [col]: d[col].filter((x) => x.id !== id) })),
+    update: (col, id, patch) => {
+      setDb((d) => ({ ...d, [col]: d[col].map((x) => (x.id === id ? { ...x, ...(typeof patch === 'function' ? patch(x) : patch) } : x)) }))
+      if (cloud) {
+        const next = typeof patch === 'function'
+          ? patch(db[col].find((x) => x.id === id) || {})
+          : patch
+        supabase.from(col).update(toRow(col, next)).eq('id', id)
+          .then(({ error }) => error && setSyncError(error.message))
+      }
+    },
+    remove: (col, id) => {
+      setDb((d) => ({ ...d, [col]: d[col].filter((x) => x.id !== id) }))
+      if (cloud) supabase.from(col).delete().eq('id', id).then(({ error }) => error && setSyncError(error.message))
+    },
     resetDemo: () => setDb(seedDb()),
 
     demoLogin: (role) => setUser({ role, demo: true, name: role === 'owner' ? 'Chaun P.' : 'Maria G.', email: role === 'owner' ? 'chaun@pinedahvac.com' : 'maria@example.com' }),
@@ -155,9 +245,17 @@ export function StoreProvider({ children }) {
       const { error } = await supabase.auth.signUp({ email, password, options: { data: { name, role: 'client' } } })
       if (error) throw error
     },
-    signOut: () => { setUser(null); if (supabase) supabase.auth.signOut() },
-  }), [])
+    signOut: () => {
+      setUser(null)
+      setSyncError(null)
+      setDb(seedDb()) // don't leave a real account's data on the device
+      if (supabase) supabase.auth.signOut()
+    },
+  }), [cloud, db])
 
-  const value = useMemo(() => ({ db, user, live: !!supabase, ...api }), [db, user, api])
+  const value = useMemo(
+    () => ({ db, user, live: !!supabase, cloud, syncError, ...api }),
+    [db, user, cloud, syncError, api],
+  )
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }

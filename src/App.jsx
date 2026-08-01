@@ -151,7 +151,7 @@ function Login() {
 }
 
 export default function App() {
-  const { user, signOut } = useStore()
+  const { user, signOut, cloud, syncError } = useStore()
   const [screen, setScreen] = useState(null)
 
   if (!user) return <Login />
@@ -173,7 +173,9 @@ export default function App() {
           <img src={logo} alt="" className="h-9 w-9 rounded-lg object-contain" />
           <div className="leading-tight">
             <div className="font-cond text-base font-bold tracking-wide">PINEDA OS</div>
-            <div className="text-[10px] text-faint">{role === 'owner' ? 'Owner Command Center' : 'Client Portal'}</div>
+            <div className="text-[10px] text-faint">
+              {cloud ? 'Synced · all devices' : role === 'owner' ? 'Owner Command Center' : 'Client Portal'}
+            </div>
           </div>
         </div>
         <div className="app-scroll flex-1 overflow-y-auto">
@@ -219,6 +221,12 @@ export default function App() {
             <LogOut className="h-3.5 w-3.5" /> Sign out
           </button>
         </header>
+
+        {syncError && (
+          <div role="alert" className="border-b border-red/30 bg-red/10 px-4 py-2 text-[11px] font-semibold text-red">
+            Cloud sync issue: {syncError} — your changes are saved on this device.
+          </div>
+        )}
 
         <main className="app-scroll flex-1 overflow-y-auto px-4 py-4 pb-24 lg:px-8 lg:py-6 lg:pb-8">
           <div className="mx-auto w-full max-w-xl lg:max-w-3xl">

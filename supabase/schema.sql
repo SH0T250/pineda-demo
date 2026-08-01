@@ -1,5 +1,6 @@
 -- Pineda OS — Supabase schema. Paste into Supabase SQL Editor and run once.
 -- Auth uses Supabase's built-in auth.users; role/name live in user_metadata.
+-- Already ran the first version? Run migration-01.sql instead of this file.
 
 create table if not exists jobs (
   id uuid primary key default gen_random_uuid(),
@@ -22,7 +23,11 @@ create table if not exists invoices (
   created_at timestamptz not null default now(),
   client text not null, amt numeric not null default 0,
   status text not null default 'SENT', -- OVERDUE | SENT | VIEWED | PAID
-  tone text default 'amber'
+  tone text default 'amber',
+  num text, addr text, service text,
+  issued text, due text, reminded text,
+  tax numeric default 0,
+  lines jsonb not null default '[]'
 );
 
 create table if not exists parts (
@@ -37,7 +42,7 @@ create table if not exists assets (
   status text default 'ON TRUCK', tone text default 'green'
 );
 
--- Row Level Security: authenticated users read/write everything (single-company app).
+-- Row Level Security: signed-in users read/write everything (single-company app).
 alter table jobs enable row level security;
 alter table quotes enable row level security;
 alter table invoices enable row level security;
@@ -48,6 +53,8 @@ do $$
 declare t text;
 begin
   foreach t in array array['jobs','quotes','invoices','parts','assets'] loop
-    execute format('create policy "auth all" on %I for all to authenticated using (true) with check (true)', t);
+    if not exists (select 1 from pg_policies where tablename = t and policyname = 'auth all') then
+      execute format('create policy "auth all" on %I for all to authenticated using (true) with check (true)', t);
+    end if;
   end loop;
 end $$;
