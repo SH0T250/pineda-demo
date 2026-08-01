@@ -1,69 +1,103 @@
-import { ChevronRight } from 'lucide-react'
-import { APP_TODAY, todayStats, jobs, techs, money } from '../data.js'
-import { Card, Stat, Row, Badge, Footnote } from '../ui.jsx'
+// Daily Dashboard — owner's morning view, computed live from the store.
+import { Plus, FileText, ChevronRight } from 'lucide-react'
+import { ScreenTitle, Stat, Card, Button, Row } from '../ui.jsx'
+import { useStore } from '../store.jsx'
+import { money, APP_TODAY, techs, todayStats } from '../data.js'
+
+const Label = ({ children }) => (
+  <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted">{children}</div>
+)
 
 export default function Dashboard({ go }) {
-  const done = jobs.filter((j) => j.done)
-  const maxMiles = Math.max(...techs.map((t) => t.miles))
+  const { db } = useStore()
+
+  const done = db.jobs.filter((j) => j.done)
+  const todayRev = done.reduce((s, j) => s + j.rev, 0)
+  const todayProfit = done.reduce((s, j) => s + j.profit, 0)
+  const margin = todayRev ? ((todayProfit / todayRev) * 100).toFixed(1) + '%' : '—'
+  const topClients = [...done].sort((a, b) => b.rev - a.rev).slice(0, 3)
+  const openInv = db.invoices.filter((i) => i.status !== 'PAID')
+  const outstanding = openInv.reduce((s, i) => s + i.amt, 0)
+  const maxMiles = Math.max(...techs.map((t) => t.miles), 1)
+
   return (
     <div className="rise-in flex flex-col gap-4">
-      <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-amber">Daily Dashboard · {APP_TODAY.label}</div>
-        <h1 className="font-cond text-3xl font-bold leading-tight">Good morning, Chaun</h1>
+      <ScreenTitle kicker={`Daily Dashboard · ${APP_TODAY.label}`} title="Good morning, Chaun" />
+
+      <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Revenue Today" value={money(todayRev)} />
+        <Stat label="Gross Profit" value={money(todayProfit)} sub={`${margin} margin`} tone="green" />
+        <Stat label="Jobs Completed" value={done.length} sub={`${db.jobs.length} scheduled`} />
+        <Stat label="Miles Driven" value={todayStats.miles} sub={`${techs.length} trucks`} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label="Revenue Today" value={money(todayStats.revenue)} sub="5 tickets closed" tone="green" />
-        <Stat label="Gross Profit" value={money(todayStats.profit)} sub={todayStats.marginPct + ' margin'} tone="green" />
-        <Stat label="Jobs Completed" value={todayStats.jobsDone} sub="1 more at 5:00p" />
-        <Stat label="Miles Driven" value={todayStats.miles} sub="3 trucks out" />
+      <div className="flex gap-3">
+        <Button variant="primary" className="flex-1" onClick={() => go?.('schedule')}>
+          <Plus className="h-4 w-4" /> New Job
+        </Button>
+        <Button variant="secondary" className="flex-1" onClick={() => go?.('quote')}>
+          <FileText className="h-4 w-4" /> New Quote
+        </Button>
       </div>
 
-      <Card>
-        <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted">Revenue per client · per job</div>
-        {todayStats.topClients.map((c) => (
-          <Row key={c.name} left={c.name} right={money(c.amt)} />
-        ))}
-      </Card>
-
-      <Card onClick={() => go('invoices')} className="flex items-center justify-between">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted">Outstanding invoices</div>
-          <div className="tnum font-cond text-2xl font-bold">$6,620 <span className="text-sm font-semibold text-red">· 4 open</span></div>
-        </div>
-        <ChevronRight className="h-5 w-5 text-faint" />
-      </Card>
-
-      <Card>
-        <div className="mb-1 flex items-center justify-between">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-muted">Daily log · today's jobs</div>
-          <Badge tone="green">LIVE</Badge>
-        </div>
-        {done.map((j) => (
-          <Row key={j.time} left={`${j.client} — ${j.task}`} sub={j.parts} right={money(j.rev)} rightSub={`+${money(j.profit)}`} />
-        ))}
-        <div className="mt-2 flex items-center justify-between border-t border-navy-600 pt-2 text-sm font-bold">
-          <span>Total</span>
-          <span className="tnum">{money(todayStats.revenue)} <span className="text-green">+{money(todayStats.profit)}</span></span>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-muted">Miles per truck</div>
-        <div className="flex flex-col gap-2">
-          {techs.map((t) => (
-            <div key={t.id} className="flex items-center gap-3">
-              <span className="w-14 text-xs font-semibold text-muted">{t.truck}</span>
-              <div className="h-2 flex-1 overflow-hidden rounded-full bg-navy-700">
-                <div className="h-full rounded-full bg-amber" style={{ width: `${(t.miles / maxMiles) * 100}%` }} />
-              </div>
-              <span className="tnum w-12 text-right text-xs font-bold">{t.miles} mi</span>
-            </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        {/* Daily log — left column on desktop */}
+        <Card>
+          <Label>Daily Log</Label>
+          {done.map((j) => (
+            <Row
+              key={j.id}
+              left={`${j.client} — ${j.task}`}
+              sub={j.parts}
+              right={money(j.rev)}
+              rightSub={<span className="tnum text-green">+{money(j.profit)}</span>}
+            />
           ))}
-        </div>
-      </Card>
+          <div className="mt-0.5 flex items-center justify-between border-t border-border-2 pt-2.5">
+            <div className="text-sm font-bold">Total</div>
+            <div className="text-right">
+              <div className="tnum text-sm font-bold">{money(todayRev)}</div>
+              <div className="tnum text-[11px] text-green">+{money(todayProfit)}</div>
+            </div>
+          </div>
+        </Card>
 
-      <Footnote>From the truck to the dashboard. Total control.</Footnote>
+        {/* Right column */}
+        <div className="flex flex-col gap-4">
+          <Card>
+            <Label>Revenue per Client</Label>
+            {topClients.map((j) => (
+              <Row key={j.id} left={j.client} sub={j.task} right={money(j.rev)} />
+            ))}
+          </Card>
+
+          <Card onClick={() => go?.('invoices')}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label>Outstanding Invoices</Label>
+                <div className="tnum font-cond text-[26px] font-bold leading-none">{money(outstanding)}</div>
+                <div className="mt-1 text-xs text-muted">{openInv.length} open invoices</div>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-faint" />
+            </div>
+          </Card>
+
+          <Card>
+            <Label>Miles per Truck</Label>
+            <div className="flex flex-col gap-2.5 pt-1">
+              {techs.map((t) => (
+                <div key={t.id} className="flex items-center gap-3">
+                  <div className="w-16 shrink-0 truncate text-xs font-semibold text-muted">{t.truck}</div>
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-1">
+                    <div className="h-full rounded-full bg-amber" style={{ width: `${(t.miles / maxMiles) * 100}%` }} />
+                  </div>
+                  <div className="tnum w-12 shrink-0 text-right text-xs font-bold">{t.miles} mi</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

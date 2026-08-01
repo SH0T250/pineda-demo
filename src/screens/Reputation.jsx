@@ -1,91 +1,131 @@
 import { useState } from 'react'
-import { Star } from 'lucide-react'
+import { Star, Camera, Briefcase, Sparkles, Check, MessageSquare } from 'lucide-react'
 import { reputation } from '../data.js'
-import { Card, Badge, Avatar, Button, Footnote, ScreenTitle } from '../ui.jsx'
+import { Badge, Card, ScreenTitle, Avatar, Button, Row, Footnote, useToast } from '../ui.jsx'
 
 const DRAFT =
-  'Thank you, Rick! Getting your AC back on fast is exactly why we do this. We appreciate you trusting Pineda Heating & Air — call us anytime. — Chaun'
+  "Thanks, Rick — glad we could get your AC back up that fast, that's exactly how we like to run a call. We keep pricing fair and paperwork same-day, and we'll be here whenever you need us again."
 
 export default function Reputation() {
-  const [showDraft, setShowDraft] = useState(false)
-  const [posted, setPosted] = useState(false)
+  const toast = useToast()
+  const [replyState, setReplyState] = useState('idle') // idle | drafted | posted
   const [autoText, setAutoText] = useState(true)
+
+  const toggleAuto = () => {
+    setAutoText((v) => {
+      toast(v ? 'Review requests paused' : 'Review requests back on')
+      return !v
+    })
+  }
 
   return (
     <div className="rise-in flex flex-col gap-4">
       <ScreenTitle kicker="Reputation Engine" title="Reviews, handled" />
 
-      <Card className="flex flex-col items-center gap-2 py-6 text-center">
-        <div className="tnum font-cond text-6xl font-bold leading-none">{reputation.rating}</div>
-        <div className="flex gap-1">
-          {[...Array(5)].map((_, i) => (
-            <Star key={i} className="h-5 w-5 fill-amber text-amber" />
+      <div className="stagger flex flex-col gap-4">
+        {/* Hero */}
+        <Card glow className="flex flex-col items-center gap-2 py-6 text-center">
+          <div className="tnum font-cond text-[64px] font-bold leading-none">{reputation.rating}</div>
+          <div className="flex gap-1">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Star key={i} className="h-5 w-5 fill-amber text-amber" />
+            ))}
+          </div>
+          <div className="text-sm text-muted">
+            <span className="tnum font-semibold text-ink">{reputation.total}</span> · {reputation.note}
+          </div>
+        </Card>
+
+        {/* Channels */}
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {reputation.channels.map((c) => (
+            <Card key={c.name} className="flex flex-col gap-0.5 !p-3">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-muted">{c.name}</div>
+              <div className="tnum font-cond text-xl font-bold">{c.rating}</div>
+              <div className="tnum text-[11px] text-muted">{c.count} reviews</div>
+            </Card>
           ))}
         </div>
-        <div className="text-sm font-semibold">{reputation.total}</div>
-        <div className="text-xs text-muted">{reputation.note}</div>
-      </Card>
 
-      <div className="grid grid-cols-2 gap-3">
-        {reputation.channels.map((c) => (
-          <Card key={c.name} className="flex items-center justify-between py-3">
-            <div className="text-sm font-semibold">{c.name}</div>
-            <div className="text-right">
-              <div className="tnum font-cond text-lg font-bold leading-none">{c.rating}</div>
-              <div className="tnum text-[11px] text-muted">{c.count}</div>
+        {/* Social chips */}
+        <div className="flex flex-wrap gap-2">
+          {reputation.social.map((s) => (
+            <span key={s.name} className="inline-flex items-center gap-2 rounded-full border border-border-2 bg-surface-2 px-3.5 py-2 text-xs font-semibold">
+              {s.name === 'Instagram' ? <Camera className="h-3.5 w-3.5 text-amber" /> : <Briefcase className="h-3.5 w-3.5 text-amber" />}
+              {s.name}
+              <span className="tnum font-normal text-muted">{s.note}</span>
+            </span>
+          ))}
+        </div>
+
+        {/* Review needing reply */}
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <Avatar initials="RD" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold">{reputation.review.who}</div>
+              <div className="text-xs text-muted">{reputation.review.meta}</div>
             </div>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        {reputation.social.map((s) => (
-          <div key={s.name} className="flex flex-1 items-center justify-between rounded-full border border-navy-600/60 bg-navy-800/80 px-4 py-2">
-            <span className="text-xs font-bold">{s.name}</span>
-            <span className="text-[11px] text-muted">{s.note}</span>
+            {replyState === 'posted'
+              ? <Badge tone="green">POSTED</Badge>
+              : <Badge tone="red" pulse>{reputation.review.badge}</Badge>}
           </div>
-        ))}
-      </div>
+          <p className="text-sm italic leading-relaxed text-muted">{reputation.review.text}</p>
 
-      <Card>
-        <div className="flex items-start gap-3">
-          <Avatar initials="RD" />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <div>
-                <div className="text-sm font-semibold">{reputation.review.who}</div>
-                <div className="text-xs text-muted">{reputation.review.meta}</div>
+          {replyState !== 'idle' && (
+            <div className="fade-in rounded-xl border border-border-1 bg-surface-1 p-3.5">
+              <div className="mb-1.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-amber">
+                <Sparkles className="h-3 w-3" /> AI draft
               </div>
-              <Badge tone="red">{reputation.review.badge}</Badge>
+              <p className="text-sm leading-relaxed">{DRAFT}</p>
             </div>
-            <p className="mt-2 text-sm italic leading-relaxed text-ink/90">{reputation.review.text}</p>
-          </div>
-        </div>
+          )}
 
-        {showDraft && (
-          <div className="mt-3 rounded-xl border border-navy-600 bg-navy-900/80 p-3">
-            <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-amber">AI draft</div>
-            <p className="text-sm leading-relaxed">{DRAFT}</p>
-            <Button primary className="mt-3 w-full" onClick={() => setPosted(true)}>
-              {posted ? 'Posted ✓' : 'Post reply'}
-            </Button>
+          <div className="flex gap-2">
+            {replyState === 'idle' && (
+              <>
+                <Button variant="primary" className="flex-1" onClick={() => setReplyState('drafted')}>
+                  <Sparkles className="h-4 w-4" /> AI-draft reply
+                </Button>
+                <Button variant="secondary" onClick={() => toast('Opening reply on Google')}>
+                  <MessageSquare className="h-4 w-4" /> Reply
+                </Button>
+              </>
+            )}
+            {replyState === 'drafted' && (
+              <Button variant="primary" className="flex-1" onClick={() => { setReplyState('posted'); toast('Reply posted to Google') }}>
+                Post reply
+              </Button>
+            )}
+            {replyState === 'posted' && (
+              <div className="flex min-h-11 flex-1 items-center justify-center gap-2 text-sm font-bold text-green">
+                <Check className="h-4 w-4" /> Posted
+              </div>
+            )}
           </div>
-        )}
+        </Card>
 
-        {!showDraft && (
-          <div className="mt-3 flex gap-2">
-            <Button primary className="flex-1" onClick={() => setShowDraft(true)}>AI-draft reply</Button>
-            <Button className="flex-1">Reply</Button>
-          </div>
-        )}
-      </Card>
-
-      <Card className="flex items-center justify-between gap-3" onClick={() => setAutoText(!autoText)}>
-        <div className="text-sm font-semibold">Auto-text a review request after each job</div>
-        <div className={`relative h-6 w-11 shrink-0 rounded-full transition ${autoText ? 'bg-amber' : 'bg-navy-600'}`}>
-          <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-navy-950 transition-all ${autoText ? 'left-[22px]' : 'left-0.5'}`} />
-        </div>
-      </Card>
+        {/* Auto-request toggle */}
+        <Card>
+          <Row
+            left="Auto-text a review request after each job"
+            sub={autoText ? 'On — sends 30 min after job close' : 'Off'}
+            right={
+              <button
+                role="switch"
+                aria-checked={autoText}
+                aria-label="Auto-text review requests"
+                onClick={toggleAuto}
+                className="-m-2 rounded-full p-2"
+              >
+                <span className={`relative block h-7 w-12 rounded-full border transition ${autoText ? 'border-amber/60 bg-amber' : 'border-border-2 bg-surface-1'}`}>
+                  <span className={`absolute top-0.5 h-[22px] w-[22px] rounded-full transition-all ${autoText ? 'left-[22px] bg-navy-950' : 'left-0.5 bg-muted'}`} />
+                </span>
+              </button>
+            }
+          />
+        </Card>
+      </div>
 
       <Footnote>5 stars compound — every job asks for its review automatically.</Footnote>
     </div>
