@@ -230,4 +230,126 @@ export const assistant = [
 
 export const assistantOffer = { slot: 'Today · 3:30–5:00 PM', desc: 'Capacitor diagnosis · Est. $189–$310' }
 
+// ---- Air Filter section (client-facing) ------------------------------------
+// One record per FILTER LOCATION, not per home. Due math: dueIn = intervalDays
+// − sinceChanged, both in days, evaluated against the pinned APP_TODAY.
+export const filterSeed = [
+  {
+    nickname: 'Upstairs · hallway ceiling',
+    system: 'System 1 · Goodman 3-Ton',
+    nominal: '20x25x1',
+    actual: '19.5 × 24.5 × 0.75',
+    thickness: '1"',
+    ftype: '1-inch pleated',
+    merv: 11,
+    brand: 'Filtrete',
+    pn: 'FLT-2025-M11',
+    qty: 1,
+    baseDays: 60,
+    modifiers: ['Pets in home · −25%'],
+    intervalDays: 45,
+    sinceChanged: 33,
+    lastChangedLabel: 'May 23, 2025',
+    source: 'Photo identified',
+    confidence: 'High',
+    arrow: 'Airflow arrow points UP, into the ceiling',
+    keepOnHand: 'A 6-pack is about a year for you',
+    log: [
+      { date: 'May 23, 2025', by: 'customer', note: 'Logged from the home card' },
+      { date: 'Apr 8, 2025', by: 'tech', tech: 'Chaun P.', note: 'Verified on spring tune-up · size confirmed against slot' },
+      { date: 'Feb 21, 2025', by: 'customer', note: '' },
+      { date: 'Jan 4, 2025', by: 'customer', note: 'Cedar season — swapped early' },
+    ],
+  },
+  {
+    nickname: 'Downstairs · media cabinet at unit',
+    system: 'System 2 · Goodman GSX140421',
+    nominal: '16x25x4',
+    actual: '15.75 × 24.75 × 3.75',
+    thickness: '4"',
+    ftype: '4-inch media',
+    merv: 13,
+    brand: 'Honeywell',
+    pn: 'FC100A1029',
+    qty: 1,
+    baseDays: 180,
+    modifiers: ['Pets in home · −25%'],
+    intervalDays: 135,
+    sinceChanged: 41,
+    lastChangedLabel: 'May 15, 2025',
+    source: 'Tech verified',
+    confidence: 'High',
+    arrow: 'Airflow arrow points toward the furnace',
+    keepOnHand: 'Two spares covers the year',
+    log: [
+      { date: 'May 15, 2025', by: 'tech', tech: 'Marcus D.', note: 'Replaced during maintenance visit · OEM media' },
+      { date: 'Jan 2, 2025', by: 'customer', note: '' },
+    ],
+  },
+]
+
+// Simulated photo-identification read (the staged AI path — reads printed text
+// off the frame, never measures). Confirm step is mandatory before any buy link.
+export const filterScanResult = {
+  nominal: '20x25x1',
+  actual: '19.5 × 24.5 × 0.75',
+  thickness: '1"',
+  brand: 'Filtrete',
+  pn: 'FLT-2025-M11',
+  merv: 11,
+  ftype: '1-inch pleated',
+  confidence: 'High',
+  legible: true,
+}
+
+// Buy options — link-outs only, size pre-filled. No inventory, no fulfillment.
+export const filterRetailers = [
+  { name: 'FilterBuy', note: 'Best price · ships to your door', eta: 'Arrives in 4–6 days', url: 'https://filterbuy.com/search/?q=' },
+  { name: 'Amazon', note: 'Fastest delivery for most homes', eta: 'Arrives in 1–2 days', url: 'https://www.amazon.com/s?k=' },
+  { name: 'Home Depot · New Braunfels', note: 'In-store pickup today', eta: 'Ready in ~2 hours', url: 'https://www.homedepot.com/s/' },
+]
+
+export const filterHowTo = {
+  steps: [
+    'Turn the system OFF at the thermostat first — never swap a filter with the blower running.',
+    'Open the return grille (two thumb latches on yours) and slide the old filter out.',
+    'Check the arrow on the new filter — yours points UP, into the ceiling.',
+    'Slide it in, close the grille, turn the system back on.',
+    'Tap “I changed it” below so your history stays warranty-ready.',
+  ],
+  warning: 'If the grille is painted shut or the filter looks wet or moldy, stop — that’s a tech visit, not a chore.',
+}
+
+// Optimize System tab — history, health, recommendations. Honest framing only:
+// no invented efficiency percentages.
+export const optimize = {
+  habits: [
+    { label: 'Current filter has been in', value: '33 days' },
+    { label: 'You change your filter every', value: '47 days on average' },
+    { label: 'On time', value: '5 of your last 6 changes' },
+  ],
+  timeline: [68, 51, 44, 48, 39, 33], // days per interval, oldest → current
+  target: 45,
+  checklist: [
+    { name: 'Air filter', status: 'Due in 12 days', tone: 'amber', note: 'On track — reorder now and the box beats the due date.' },
+    { name: 'Professional tune-up', status: 'Due soon', tone: 'amber', note: 'Last full service Apr 8. Fall tune-up keeps the 10-yr warranty valid.' },
+    { name: 'Outdoor unit clearance', status: 'Good', tone: 'green', note: '2+ feet of clear space on all sides at last visit.' },
+    { name: 'Condensate drain line', status: 'Flushed Apr 8', tone: 'green', note: 'Flushed at the spring tune-up. Annual is the target.' },
+    { name: 'Vents & returns', status: 'Good', tone: 'green', note: 'No blocked supplies or returns reported.' },
+    { name: 'System 2 age', status: '7 years', tone: 'amber', note: 'Mid-life. Nothing urgent — worth a capacity check at the next visit.' },
+  ],
+  recommendations: [
+    {
+      title: 'Book the fall tune-up',
+      body: 'Keeps your 10-year parts warranty valid and catches small problems while they’re cheap. Your last professional service was April 8.',
+      action: 'Book it',
+    },
+    {
+      title: 'Outdoor coil cleaning · System 2',
+      body: 'No professional cleaning on record in 18 months. A dirty coil makes the system work harder, cool less, and wear out sooner.',
+      action: 'Book it',
+    },
+  ],
+}
+
 export const money = (n) => '$' + n.toLocaleString('en-US', n % 1 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})

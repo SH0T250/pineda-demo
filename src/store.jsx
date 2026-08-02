@@ -2,10 +2,12 @@
 // Local driver: localStorage, seeded from data.js — full CRUD, works offline, powers demo mode.
 // Supabase driver: activates for real accounts once VITE_SUPABASE_URL/KEY are set (see SUPABASE-SETUP.md).
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { company, jobs as seedJobs, quote as seedQuote, invoices as seedInvoices, parts as seedParts, assets as seedAssets } from './data.js'
+import { company, jobs as seedJobs, quote as seedQuote, invoices as seedInvoices, parts as seedParts, assets as seedAssets, filterSeed } from './data.js'
 import { supabase } from './supabase.js'
 
-const DB_KEY = 'pineda-db-v4'
+// v5: adds the filters collection. Bumping reseeds stale local DBs; real
+// accounts refetch from Supabase on sign-in so nothing is lost.
+const DB_KEY = 'pineda-db-v5'
 const AUTH_KEY = 'pineda-auth-v2'
 
 export const LABOR_SELL = 145
@@ -137,7 +139,18 @@ function seedDb() {
     invoices: seedInvoices.items.map((i) => ({ id: uid(), ...i, ...INVOICE_DETAILS[i.client] })),
     parts: seedParts.map((p) => ({ id: uid(), ...p, markupPct: parseInt(p.markup) })),
     assets: seedAssets.items.map((a) => ({ id: uid(), ...a })),
+    filters: filterSeed.map((f) => ({ id: uid(), ...f })),
   }
+}
+
+// Filter due math — evaluated against the pinned APP_TODAY, like everything else.
+// Returns dueIn (days, negative = overdue) and a status the UI can render directly.
+export function filterDue(f) {
+  if (!f?.nominal) return { dueIn: null, status: 'No data on file', tone: 'muted' }
+  const dueIn = f.intervalDays - f.sinceChanged
+  if (dueIn < 0) return { dueIn, status: `${-dueIn} days overdue`, tone: 'red' }
+  if (dueIn <= 14) return { dueIn, status: `Due in ${dueIn} days`, tone: 'amber' }
+  return { dueIn, status: `Due in ${dueIn} days`, tone: 'green' }
 }
 
 function loadDb() {
@@ -157,6 +170,7 @@ const COLS = {
   invoices: ['client', 'amt', 'status', 'tone', 'num', 'addr', 'service', 'issued', 'due', 'reminded', 'tax', 'lines'],
   parts: ['item', 'vendor', 'pn', 'cost', 'markupPct'],
   assets: ['name', 'tag', 'value', 'status', 'tone'],
+  filters: ['nickname', 'system', 'nominal', 'actual', 'thickness', 'ftype', 'merv', 'brand', 'pn', 'qty', 'baseDays', 'modifiers', 'intervalDays', 'sinceChanged', 'lastChangedLabel', 'source', 'confidence', 'arrow', 'keepOnHand', 'log'],
 }
 const snake = (s) => s.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase())
 const camel = (s) => s.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
@@ -174,16 +188,27 @@ const fromRow = (row) => {
 
 // Sort column per table. Only the transactional tables carry created_at; the
 // parts and asset catalogs don't, and sorting them by name reads better anyway.
-const ORDER_BY = { jobs: 'created_at', quotes: 'created_at', invoices: 'created_at', parts: 'item', assets: 'name' }
+const ORDER_BY = { jobs: 'created_at', quotes: 'created_at', invoices: 'created_at', parts: 'item', assets: 'name', filters: 'created_at' }
 
 async function fetchAll() {
   const cols = Object.keys(COLS)
   const results = await Promise.all(cols.map((c) => supabase.from(c).select('*').order(ORDER_BY[c])))
   const out = {}
+  const missing = []
   results.forEach((r, i) => {
-    if (r.error) throw new Error(`${cols[i]}: ${r.error.message}`)
+    if (r.error) {
+      // A table that hasn't been migrated yet isn't a sync failure — run that
+      // collection from the local seed until its migration lands.
+      if (/does not exist/i.test(r.error.message)) {
+        missing.push(cols[i])
+        out[cols[i]] = seedDb()[cols[i]]
+        return
+      }
+      throw new Error(`${cols[i]}: ${r.error.message}`)
+    }
     out[cols[i]] = r.data.map(fromRow)
   })
+  out.__missing = missing
   return out
 }
 
@@ -191,7 +216,9 @@ async function fetchAll() {
 // app isn't blank. Only seeds tables that are actually empty.
 async function seedRemoteIfEmpty(remote) {
   const local = seedDb()
-  const empty = Object.keys(COLS).filter((c) => remote[c].length === 0)
+  const missing = remote.__missing || []
+  delete remote.__missing
+  const empty = Object.keys(COLS).filter((c) => remote[c].length === 0 && !missing.includes(c))
   if (!empty.length) return remote
   for (const col of empty) {
     const rows = local[col].map((r) => toRow(col, r))
@@ -250,6 +277,10 @@ export function StoreProvider({ children }) {
     return () => { cancelled = true }
   }, [cloud])
 
+  // A write against a table whose migration hasn't run yet isn't a sync
+  // failure — the data is safe locally and uploads once the table exists.
+  const writeError = (error) => error && !/does not exist/i.test(error.message) && setSyncError(error.message)
+
   const api = useMemo(() => ({
     // Writes are optimistic: local state updates immediately so the UI never
     // waits on the network, then the row is mirrored to Supabase.
@@ -259,7 +290,7 @@ export function StoreProvider({ children }) {
       if (cloud) {
         supabase.from(col).insert(toRow(col, item)).select().single()
           .then(({ data, error }) => {
-            if (error) return setSyncError(error.message)
+            if (error) return writeError(error)
             // adopt the database's id so later edits target the right row
             setDb((d) => ({ ...d, [col]: d[col].map((x) => (x.id === withId.id ? { ...x, id: data.id } : x)) }))
           })
@@ -273,12 +304,12 @@ export function StoreProvider({ children }) {
           ? patch(db[col].find((x) => x.id === id) || {})
           : patch
         supabase.from(col).update(toRow(col, next)).eq('id', id)
-          .then(({ error }) => error && setSyncError(error.message))
+          .then(({ error }) => writeError(error))
       }
     },
     remove: (col, id) => {
       setDb((d) => ({ ...d, [col]: d[col].filter((x) => x.id !== id) }))
-      if (cloud) supabase.from(col).delete().eq('id', id).then(({ error }) => error && setSyncError(error.message))
+      if (cloud) supabase.from(col).delete().eq('id', id).then(({ error }) => writeError(error))
     },
     resetDemo: () => setDb(seedDb()),
 

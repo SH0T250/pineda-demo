@@ -3,6 +3,7 @@ import {
   LayoutDashboard, CalendarDays, Inbox as InboxIcon, Wallet, Grid3x3,
   MapPin, Wrench, Package, FileText, HandCoins, ClipboardCheck, ShieldCheck,
   HeartPulse, Star, Home, Camera, MessageCircle, LogOut, Lock, ChevronRight,
+  Wind, Gauge,
 } from 'lucide-react'
 import { company } from './data.js'
 import { useStore } from './store.jsx'
@@ -24,13 +25,15 @@ import Reputation from './screens/Reputation.jsx'
 import Portal from './screens/Portal.jsx'
 import SnapKnow from './screens/SnapKnow.jsx'
 import Assistant from './screens/Assistant.jsx'
+import Filters from './screens/Filters.jsx'
+import Optimize from './screens/Optimize.jsx'
 
 const ownerScreens = {
   dashboard: Dashboard, schedule: Schedule, crew: Crew, tools: Tools, inbox: Inbox,
   vendors: Vendors, quote: QuoteBuilder, financing: Financing, jobcomplete: JobComplete,
   warranties: Warranties, invoices: Invoices, health: Health, reputation: Reputation,
 }
-const clientScreens = { portal: Portal, snap: SnapKnow, assistant: Assistant }
+const clientScreens = { portal: Portal, snap: SnapKnow, assistant: Assistant, filters: Filters, optimize: Optimize }
 
 const ownerNav = [
   { section: 'Operations', items: [
@@ -56,6 +59,8 @@ const ownerNav = [
 const clientNav = [
   { section: 'Your Home', items: [
     { key: 'portal', name: 'Home', icon: Home },
+    { key: 'filters', name: 'Air Filters', icon: Wind },
+    { key: 'optimize', name: 'Optimize System', icon: Gauge },
     { key: 'snap', name: 'Snap & Know', icon: Camera },
     { key: 'assistant', name: 'Assistant', icon: MessageCircle },
   ]},

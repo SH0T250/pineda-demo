@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, FileText } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Wind } from 'lucide-react'
 import { maria, money } from '../data.js'
 import { Card, Badge, Avatar, Button, Row, Footnote, Sheet, useToast } from '../ui.jsx'
+import { useStore, filterDue } from '../store.jsx'
 
 const CHANNELS = ['Google', 'Facebook', 'Yelp', 'Nextdoor']
 
@@ -26,6 +27,21 @@ export default function Portal({ go }) {
   const [showSystems, setShowSystems] = useState(false)
   const [sheet, setSheet] = useState(null) // 'review' | 'pay' | 'docs'
   const toast = useToast()
+  const { db, update } = useStore()
+
+  // Air-filter home card — the one-glance view. Soonest-due filter leads.
+  const filters = [...(db.filters || [])].sort((a, b) => filterDue(a).dueIn - filterDue(b).dueIn)
+  const soonest = filters[0]
+  const due = soonest && filterDue(soonest)
+
+  const logChange = () => {
+    update('filters', soonest.id, {
+      sinceChanged: 0,
+      lastChangedLabel: 'Jun 25, 2025',
+      log: [{ date: 'Jun 25, 2025', by: 'customer', note: 'Logged from the home card' }, ...(soonest.log || [])],
+    })
+    toast(`Logged — next due in ${soonest.intervalDays} days`)
+  }
 
   const tileAction = {
     'Book Service': () => go && go('assistant'),
@@ -53,6 +69,29 @@ export default function Portal({ go }) {
         </div>
         <Button variant="primary" className="shrink-0" onClick={() => go && go('assistant')}>Book</Button>
       </Card>
+
+      {/* Air filter card — one glance, no tapping (spec §4.2) */}
+      {soonest && (
+        <Card>
+          <div className="mb-1.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted">
+              <Wind className="h-3.5 w-3.5" /> Air Filter
+            </div>
+            <Badge tone={due.tone}>{due.status}</Badge>
+          </div>
+          <div className="text-sm font-semibold">{soonest.nickname}</div>
+          <div className="tnum text-xs text-muted">{soonest.nominal} · MERV {soonest.merv}</div>
+          <div className="mt-3 flex gap-2.5">
+            <Button variant="primary" className="flex-1" onClick={logChange}>I changed it</Button>
+            <Button variant="secondary" className="flex-1" onClick={() => go && go('filters')}>Reorder</Button>
+          </div>
+          {filters.length > 1 && (
+            <button onClick={() => go && go('filters')} className="mt-2.5 w-full text-center text-xs font-semibold text-muted transition hover:text-ink">
+              {filters.length - 1} more filter{filters.length > 2 ? 's' : ''} →
+            </button>
+          )}
+        </Card>
+      )}
 
       <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-3">
         {maria.tiles.map((t) => {
